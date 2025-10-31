@@ -1,0 +1,1 @@
+# Images used as training set from CVAT annotation tool
