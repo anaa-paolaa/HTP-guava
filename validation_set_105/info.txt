@@ -1,0 +1,1 @@
+In this folder is the dataset of 105 images measured by hand with ImageJ for cross-validation.
