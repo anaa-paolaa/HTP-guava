@@ -1,5 +1,5 @@
-Workflow para análisis de imágenes de guayaba por medio de PlantCV.
+## Workflow for HTP-phenotyping of guava images.
 
-En este espacio se ha guardado los sets de imágenes utilizados en 2025-2026, al igual que los scripts importantes.
+This space serves as historical repository of scripts and images-sets for the analysis.
 
-El pipeline ready-to-run se encuentra en Google Drive.
+The ready-to-run pipeline was set to run at GoogleColab space for easier use connected through Google Drive.
