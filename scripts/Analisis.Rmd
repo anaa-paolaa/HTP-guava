@@ -1,0 +1,181 @@
+---
+title: "Guava's image analysis - Version 8.0"
+author: "Ana Valladares"
+date: "2026-02-06"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r dependencies, results='hide', message=FALSE}
+library(ggplot2)
+library(metan)
+library(dplyr)
+library(readxl)
+library(MASS)
+library(ggpubr)
+library(DT)
+library(stringr)
+```
+
+# Analisis de exactitud y precisión del Programa diseñado Version 8.0
+
+Un programa de análisis de imágenes fue desarrollado por medio del paquete PlantCV en Python y DL, para segmentar la fruta de guayaba en: semillas, endocarpo, mesocarpo y fondo. Con dicha segmentación se calculó por medio del conteo de pixeles los siguientes caracteres de interés : Area total de fruta (cm2), Altura y Ancho de fruta (cm), Area de mesocarpo (cm2), No. de semillas (unidades), Radio de semillas en endocarpo (%) y Radio de endocarpo en mesocarpo (%).
+
+Dicho programa, utilizó un set de 105 imágenes, los resultados de esta versión se presentan a continuación.
+
+### Resultados Programa Version 8.0 
+```{r Input.data1, echo=FALSE}
+rm(list = ls()) #environment empty
+prog_res = read.csv("~/Desktop/Guava/Outputs/results_validation.csv")
+#remove extra columns
+prog_res$color_endo.meso = as.factor(prog_res$color_endo.meso )
+DT::datatable(prog_res)
+```
+
+Para poder comparar la exactitud de dichas medidas, se obtuvieron otro set de medidas de manera manual por medio de la herramienta ImageJ, que se presentan a continuación.
+
+### Resultados Medición manual
+```{r Input.data2, echo=FALSE}
+man_res = read.csv("~/Desktop/Guava/Outputs/Guava_analysis - ImageJ_results_upd105.csv")
+#remove extra columns
+man_res = man_res[,-c(1,3,7,21)] 
+man_res$color_endo.meso = as.factor(man_res$color_endo.meso)
+DT::datatable(man_res)
+
+man_res2 = merge(prog_res['id'],man_res,by="id", all.x = T )
+# Corrections , additions 
+prog_res$variedad <- str_extract(prog_res$id, "(?<=-)[A-Z]+(?=-)")
+prog_res$variedad <- as.factor(prog_res$variedad)
+man_res2$variedad <- str_extract(man_res2$id, "(?<=-)[A-Z]+(?=-)")
+man_res2$variedad <- as.factor(man_res2$variedad)
+```
+
+Con estas medidas se pueden elaborar los siguientes tests para la exactitud del programa.
+
+## Test de correlación
+
+Test usando el coeficiente de correlación obtenido por Pearson's product moment para medir asociación entre pares de resultados (programa y manual).
+
+```{r Pearsons.r, echo=FALSE}
+res.cor <- NULL
+vars <- c('area_cm2_fruto','height_cm_fruto','width_cm_fruto','area_cm2_mesocarpo','width_cm_mesocarpo','area_cm2_endocarpo','width_cm_endocarpo','num_units_semillas' ,'area_cm2_semillas','ratio_percent_semillas','ratio_percent_endocarpo')
+for (i in vars){
+  var1 <- prog_res[,i] 
+  var2 <- man_res2[,i]
+  
+  tmp_test <- cor.test(var1,var2)
+  
+  tmp <- data.frame(variable=i, cor.r=tmp_test$estimate, p.val=tmp_test$p.value)
+  
+  res.cor <- rbind(res.cor, tmp)
+}
+print(res.cor)
+```
+
+```{r, echo=FALSE}
+a = merge(man_res2[,c('id','color_endo.meso')], prog_res[,c('id','color_endo.meso')], by="id")
+# Initialize the new column with a default value (e.g., 'NO')
+a$resp = 'NO'
+
+# Loop through row indices, not the ID values themselves
+for (i in 1:nrow(a)) {
+  # Select the specific row using numeric index i
+  tmp = a[i,]
+  
+  # Perform comparison
+  if (tmp$color_endo.meso.x == tmp$color_endo.meso.y) {
+    # Update the original dataframe directly, not just the temp object
+    a$resp[i] = 'YES'
+  }
+}
+
+```
+
+
+### R x tipo de guayaba
+
+```{r Pearsons.r.tipo, echo=FALSE}
+res.cor.tipo <- NULL
+vars <- c('area_cm2_fruto','height_cm_fruto','width_cm_fruto','area_cm2_mesocarpo','width_cm_mesocarpo','area_cm2_endocarpo','width_cm_endocarpo','num_units_semillas' ,'area_cm2_semillas','ratio_percent_semillas','ratio_percent_endocarpo')
+
+for (j in unique(prog_res$color_endo.meso)){
+  temp_prog <- prog_res[prog_res$color_endo.meso==j,]  
+  temp_man <- man_res2[man_res2$barcode %in% temp_prog$barcode, ]
+  
+  for (i in vars){
+  var1 <- temp_prog[,i] 
+  var2 <- temp_man[,i]
+  
+  tmp_test <- cor.test(var1,var2)
+  
+  tmp <- data.frame(variable=i,tipo=j, cor.r=tmp_test$estimate, p.val=tmp_test$p.value)
+  
+  res.cor.tipo <- rbind(res.cor.tipo, tmp)
+  }
+}
+print(res.cor.tipo)
+```
+
+### Gráficos de asociación x tipo de guayaba
+
+```{r Scatterplots, echo=FALSE}
+#filename <- paste0('Guava_project_scatterplots_v1.pdf') -- if needed in PDF
+#pdf(width = 8,height = 8, file = filename) -- if needed in PDF
+
+par(mar=c(5,5,2,2))
+
+
+for (j in unique(prog_res$color_endo.meso)){
+  temp_prog <- prog_res[prog_res$color_endo.meso==j,]  
+  temp_man <- man_res2[man_res2$barcode %in% temp_prog$barcode, ]
+  
+  for (i in vars){
+  var1 <- temp_prog[,i] 
+  var2 <- temp_man[,i]
+  
+  tmp_test <- cor.test(var1,var2)
+  x = paste0('HTP_',i,' ',j)
+  y = paste0('Manual_',i)
+  
+  plot(var1, var2, xlab= x, ylab=y, las=1, cex.lab=1, cex.axis=1.5, pch=19, cex=1.5,
+       col="black")
+  mylm <- lm(var2 ~ var1)
+  abline(mylm, lty=1, lwd=2, col="red")
+  
+  if (tmp_test$estimate > 0){
+    pos.legend <- "bottomright"
+    } else {
+      pos.legend <- "topright"
+    }
+  
+  mylegend <- paste0(" r = ", round(tmp_test$estimate, 3), "\n", " p = ",round(tmp_test$p.value,5))
+  legend(pos.legend, bty="n", legend=mylegend, cex=1.2)
+  }
+}
+#dev.off() -- if needed in PDF
+
+```
+# Análisis x tipo de guayaba
+```{r outliers, echo=FALSE}
+vars <- c("area_cm2_fruto",'area_cm2_mesocarpo','width_cm_mesocarpo','area_cm2_endocarpo','width_cm_endocarpo','num_units_semillas' ,'area_cm2_semillas','ratio_percent_semillas','ratio_percent_endocarpo') 
+
+for (i in vars){
+ plot = ggplot(prog_res) + aes(x=variedad, y =prog_res[,i])  +
+  geom_boxplot(outlier.color = "red") + labs(x= "Variedades", y = i)
+print(plot)
+}
+```
+
+
+# Conclusiones
+
+En general, la mayoría de las medidas programadas presentan un alto valor de correlación con un r >= 0.99 para las medidas del fruto, r >= 0.94 para mesocarpo, r >= 0.96 para el endocarpo y r = 0.85 para el no. de semillas. 
+
+Se logró mejorar con el DL las medidas de área de semilla (de r = 0.34 a r = 0.77), el radio de semillas en el endocarpo (de r = 0.12 a r = 0.68) y el radio de endocarpo en mesocarpo (de r = 0.65 a r = 0.91). 
+* NB = Para los colores, 6 imágenes/105 fueron mal etiquetadas entre rosa.verde y rosa.rosa.
+
